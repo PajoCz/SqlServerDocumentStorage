@@ -3,11 +3,11 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{66544522-E5AA-4184-92A7-94370E6E8B0C}</ProjectGuid>
+    <ProjectGuid>{BDFA41C1-F688-454B-9CDD-D4E1FCA61F8F}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>SqlServerDocumentStorage</RootNamespace>
-    <AssemblyName>SqlServerDocumentStorage</AssemblyName>
+    <RootNamespace>SqlServerDocumentStorage.Tests</RootNamespace>
+    <AssemblyName>SqlServerDocumentStorage.Tests</AssemblyName>
     <TargetFrameworkVersion>v4.6</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <ProjectTypeGuids>{3AC096D0-A1C2-E12C-1390-A8335801FDAB};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
@@ -35,18 +35,8 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Newtonsoft.Json, Version=8.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
-      <HintPath>..\packages\Newtonsoft.Json.8.0.3\lib\net45\Newtonsoft.Json.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="nunit.framework, Version=3.2.1.0, Culture=neutral, PublicKeyToken=2638cd05610744eb, processorArchitecture=MSIL">
-      <HintPath>..\packages\NUnit.3.2.1\lib\net45\nunit.framework.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Data" />
-    <Reference Include="System.Xml" />
-    <Reference Include="System.Xml.Linq" />
   </ItemGroup>
   <Choose>
     <When Condition="('$(VisualStudioVersion)' == '10.0' or '$(VisualStudioVersion)' == '') and '$(TargetFrameworkVersion)' == 'v3.5'">
@@ -61,17 +51,22 @@
     </Otherwise>
   </Choose>
   <ItemGroup>
-    <Compile Include="AdditionContext.cs" />
-    <Compile Include="DocumentManager.cs" />
-    <Compile Include="IAdditionContext.cs" />
-    <Compile Include="Index.cs" />
-    <Compile Include="IndexAttribute.cs" />
-    <Compile Include="MyContractResolver.cs" />
-    <Compile Include="SqlContext.cs" />
+    <Compile Include="DocumentManagerTests.cs" />
+    <Compile Include="Fixtures\Endpoint.cs" />
+    <Compile Include="Fixtures\HttpMethod.cs" />
+    <Compile Include="Fixtures\Project.cs" />
+    <Compile Include="Fixtures\Request.cs" />
+    <Compile Include="Fixtures\Resource.cs" />
+    <Compile Include="Fixtures\Response.cs" />
+    <Compile Include="Fixtures\Space.cs" />
+    <Compile Include="SystemTest.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="packages.config" />
+    <ProjectReference Include="..\SqlServerDocumentStorage\SqlServerDocumentStorage.csproj">
+      <Project>{66544522-E5AA-4184-92A7-94370E6E8B0C}</Project>
+      <Name>SqlServerDocumentStorage</Name>
+    </ProjectReference>
   </ItemGroup>
   <Choose>
     <When Condition="'$(VisualStudioVersion)' == '10.0' And '$(IsCodedUITest)' == 'True'">
