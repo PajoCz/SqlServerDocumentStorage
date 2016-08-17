@@ -66,6 +66,7 @@
     <Compile Include="IInsertionContext.cs" />
     <Compile Include="Index.cs" />
     <Compile Include="IndexAttribute.cs" />
+    <Compile Include="IStatemetContext.cs" />
     <Compile Include="IUpdateContext.cs" />
     <Compile Include="MyContractResolver.cs" />
     <Compile Include="MyContractResolver2.cs" />
