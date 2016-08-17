@@ -1,25 +1,22 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.ComponentModel;
 using System.Data;
 using System.Data.SqlClient;
-using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Serialization;
 
 namespace SqlServerDocumentStorage
 {
     public class DocumentManager : IDisposable
     {
         private readonly SqlConnection connection;
+        private readonly ICollection<IInsertionContext> inserts = new Collection<IInsertionContext>();
         private readonly SqlTransaction transaction;
-        private readonly ICollection<IInsertionContext> additions = new Collection<IInsertionContext>();
+        private readonly ICollection<IUpdateContext> updates = new Collection<IUpdateContext>();
 
         public DocumentManager(SqlConnection connection, SqlTransaction transaction)
         {
@@ -29,14 +26,17 @@ namespace SqlServerDocumentStorage
 
         public bool AutoCreateTables { get; set; }
 
+        public void Dispose()
+        {
+        }
+
         public async Task SaveChangesAsync()
         {
-            foreach (var add in additions)
+            foreach (var add in inserts)
             {
                 try
                 {
                     await InsertAsync(add);
-
                 }
                 catch (SqlException e)
                 {
@@ -48,6 +48,58 @@ namespace SqlServerDocumentStorage
                     else
                     {
                         throw e;
+                    }
+                }
+            }
+
+            inserts.Clear();
+
+            foreach (var update in updates)
+            {
+                try
+                {
+                    await UpdateAsync(update);
+                }
+                catch (SqlException e)
+                {
+                    if (e.Message.Contains("Invalid object name ") || e.Message.Contains("Could not find"))
+                    {
+                        await CreateTableAsync(update);
+                        await UpdateAsync(update);
+                    }
+                    else
+                    {
+                        throw e;
+                    }
+                }
+            }
+        }
+
+        private async Task UpdateAsync(IUpdateContext update)
+        {
+            using (var command = connection.CreateCommand())
+            {
+                command.Transaction = transaction;
+                command.CommandText = update.Sql.CommandText;
+                command.CommandType = CommandType.StoredProcedure;
+                foreach (var parameter in update.Sql.Parameters)
+                {
+                    command.Parameters.AddWithValue(parameter.ParameterName, parameter.Value);
+                }
+
+                foreach (var index in update.Indices)
+                {
+                    command.Parameters.AddWithValue(index.Name, index.Property.GetValue(update.Value));
+                }
+
+                using (var reader = await command.ExecuteReaderAsync().ConfigureAwait(false))
+                {
+                    while (await reader.ReadAsync().ConfigureAwait(false))
+                    {
+                        var id = reader.GetFieldValue<long>(reader.GetOrdinal("Id"));
+                        var valueType = update.Value.GetType();
+                        var idProperty = valueType.GetProperty("Id");
+                        idProperty.SetValue(update.Value, id);
                     }
                 }
             }
@@ -83,9 +135,9 @@ namespace SqlServerDocumentStorage
             }
         }
 
-        private async Task CreateTableAsync(IInsertionContext add)
+        private async Task CreateTableAsync(IStatemetContext add)
         {
-            StringBuilder builder = new StringBuilder();
+            var builder = new StringBuilder();
             builder.AppendLine("IF NOT EXISTS (");
             builder.AppendLine("SELECT  schema_name ");
             builder.AppendLine("FROM    information_schema.schemata ");
@@ -150,7 +202,7 @@ namespace SqlServerDocumentStorage
             }
         }
 
-        private object GetDllColumnDefinition(Index index)
+        private string GetDllColumnDefinition(Index index)
         {
             switch (index.DbType)
             {
@@ -164,7 +216,6 @@ namespace SqlServerDocumentStorage
                 case DbType.Byte:
                     break;
                 case DbType.Boolean:
-                    break;
                 case DbType.Currency:
                     break;
                 case DbType.Date:
@@ -215,7 +266,7 @@ namespace SqlServerDocumentStorage
         public InsertionContext<T> Add<T>(T document)
         {
             var schemaName = "Documents";
-            var tableName = typeof(T).Name;
+            var tableName = typeof (T).Name;
 
             var context = new InsertionContext<T>(document);
             context.Sql.TableName = tableName;
@@ -225,32 +276,39 @@ namespace SqlServerDocumentStorage
             var indices = GetIndices<T>();
             context.Indices.AddRange(indices);
 
-
             string data;
 
             var serializerSettings = GetJsonSerializerSettings(context);
             data = JsonConvert.SerializeObject(context.Model, serializerSettings);
 
-            context.Sql.Parameters.Add(new SqlParameter() { ParameterName = "Data", Value = data });
-            context.Sql.Parameters.Add(new SqlParameter() { ParameterName = "CreatedAt", Value = DateTime.Now });
+            context.Sql.Parameters.Add(new SqlParameter {ParameterName = "Data", Value = data});
+            context.Sql.Parameters.Add(new SqlParameter {ParameterName = "CreatedAt", Value = DateTime.Now});
 
-            additions.Add(context);
+            inserts.Add(context);
             return context;
         }
 
         private static JsonSerializerSettings GetJsonSerializerSettings<T>(InsertionContext<T> context)
         {
-            JsonSerializerSettings serializerSettings = new JsonSerializerSettings();
+            var serializerSettings = new JsonSerializerSettings();
             serializerSettings.ContractResolver = new MyContractResolver<T>(context);
+            return serializerSettings;
+        }
+
+        private static JsonSerializerSettings GetJsonSerializerSettings<T>(UpdateContext<T> context)
+        {
+            var serializerSettings = new JsonSerializerSettings();
+            serializerSettings.ContractResolver = new MyContractResolver2<T>(context);
             return serializerSettings;
         }
 
         private static List<Index> GetIndices<T>()
         {
-            List<Index> indices = new List<Index>();
+            var indices = new List<Index>();
             var type = typeof (T);
             var instanceProperties = type.GetProperties();
-            var indexProperties = instanceProperties.Where(x => x.GetCustomAttribute<IndexAttribute>() != null).ToArray();
+            var indexProperties =
+                instanceProperties.Where(x => x.GetCustomAttribute<IndexAttribute>() != null).ToArray();
 
             foreach (var indexProperty in indexProperties)
             {
@@ -266,14 +324,10 @@ namespace SqlServerDocumentStorage
             return indices;
         }
 
-        public void Dispose()
-        {
-        }
-
         public async Task<T> GetAsync<T>(long id) where T : new()
         {
             var schemaName = "Documents";
-            var tableName = typeof(T).Name;
+            var tableName = typeof (T).Name;
 
             var builder = new StringBuilder()
                 .Append("select top 1 * from ")
@@ -283,7 +337,7 @@ namespace SqlServerDocumentStorage
                 .Append(tableName)
                 .Append("] where Id = @Id");
 
-            T instance = default(T);
+            var instance = default(T);
 
             using (var command = connection.CreateCommand())
             {
@@ -318,13 +372,13 @@ namespace SqlServerDocumentStorage
             property.SetValue(instance, value);
         }
 
-        public async Task<List<T>>  FindWhereAsync<T>(string where, object parameters) where T : new()
+        public async Task<List<T>> FindWhereAsync<T>(string where, object parameters) where T : new()
         {
             var schemaName = "Documents";
-            var tableName = typeof(T).Name;
+            var tableName = typeof (T).Name;
 
             var builder = new StringBuilder()
-                .Append("select top 1 * from ")
+                .Append("select * from ")
                 .Append("[")
                 .Append(schemaName)
                 .Append("].[")
@@ -332,7 +386,7 @@ namespace SqlServerDocumentStorage
                 .Append("] where ")
                 .Append(where);
 
-            List<T> list = new List<T>();
+            var list = new List<T>();
 
             using (var command = connection.CreateCommand())
             {
@@ -340,18 +394,21 @@ namespace SqlServerDocumentStorage
                 command.CommandText = builder.ToString();
 
                 var sqlParameters = parameters.GetType().GetProperties().Select(x =>
-                    new SqlParameter(x.Name, x.GetValue(parameters)));
+                    new SqlParameter(x.Name, x.GetValue(parameters))).ToArray();
+
+                command.Parameters.AddRange(sqlParameters);
 
                 using (var reader = await command.ExecuteReaderAsync().ConfigureAwait(false))
                 {
                     while (await reader.ReadAsync().ConfigureAwait(false))
                     {
-                        T instance = default(T);
+                        var instance = default(T);
                         var json = reader.GetFieldValue<string>(reader.GetOrdinal("Data"));
                         instance = JsonConvert.DeserializeObject<T>(json);
                         var id = reader.GetFieldValue<long>(reader.GetOrdinal("Id"));
                         SetPropertyValue(instance, "Id", id);
                         var indices = GetIndices<T>();
+
                         foreach (var index in indices)
                         {
                             var indexColumValue = reader.GetValue(reader.GetOrdinal(index.Name));
@@ -364,6 +421,58 @@ namespace SqlServerDocumentStorage
             }
 
             return list;
+        }
+
+        public async Task DeleteWhereAsync<T>(string where, object parameters)
+        {
+            var schemaName = "Documents";
+            var tableName = typeof (T).Name;
+
+            var builder = new StringBuilder()
+                .Append("delete from ")
+                .Append("[")
+                .Append(schemaName)
+                .Append("].[")
+                .Append(tableName)
+                .Append("] where ")
+                .Append(where);
+
+            using (var command = connection.CreateCommand())
+            {
+                command.Transaction = transaction;
+                command.CommandText = builder.ToString();
+
+                var sqlParameters = parameters.GetType().GetProperties().Select(x =>
+                    new SqlParameter(x.Name, x.GetValue(parameters))).ToArray();
+
+                command.Parameters.AddRange(sqlParameters);
+                await command.ExecuteNonQueryAsync().ConfigureAwait(false);
+            }
+        }
+
+        public UpdateContext<T> Update<T>(long id, T document)
+        {
+            var schemaName = "Documents";
+            var tableName = typeof (T).Name;
+
+            var context = new UpdateContext<T>(document);
+            context.Sql.TableName = tableName;
+            context.Sql.SchemaName = schemaName;
+            context.Sql.CommandText = "[" + context.Sql.SchemaName + "].[" + context.Sql.TableName + "_Insert]";
+
+            var indices = GetIndices<T>();
+            context.Indices.AddRange(indices);
+
+            string data;
+
+            var serializerSettings = GetJsonSerializerSettings(context);
+            data = JsonConvert.SerializeObject(context.Model, serializerSettings);
+
+            context.Sql.Parameters.Add(new SqlParameter {ParameterName = "Data", Value = data});
+            context.Sql.Parameters.Add(new SqlParameter {ParameterName = "CreatedAt", Value = DateTime.Now});
+
+            updates.Add(context);
+            return context;
         }
     }
 }

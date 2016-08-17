@@ -3,12 +3,12 @@ using Newtonsoft.Json.Serialization;
 
 namespace SqlServerDocumentStorage
 {
-    public class MyContractResolver<T> : IContractResolver
+    public class MyContractResolver2<T> : IContractResolver
     {
-        private readonly IInsertionContext context;
+        private readonly IUpdateContext<T> context;
         private readonly DefaultContractResolver ContractResolver = new DefaultContractResolver();
 
-        public MyContractResolver(IInsertionContext context)
+        public MyContractResolver2(IUpdateContext<T> context)
         {
             this.context = context;
         }

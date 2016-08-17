@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 namespace SqlServerDocumentStorage
 {
-    public interface IInsertionContext : IStatemetContext
+    public interface IStatemetContext
     {
         SqlContext Sql { get; }
         List<Index> Indices { get; }

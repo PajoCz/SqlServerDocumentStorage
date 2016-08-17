@@ -15,16 +15,6 @@ namespace SqlServerDocumentStorage.Tests
             this.transaction = transaction;
         }
 
-        public static async Task<SystemTest> CreateAsync()
-        {
-            var connectionString = @"Data Source=.\SQLEXPRESS;Initial Catalog=SqlServerDocumentStorage;Integrated Security=True";
-            var connection = new SqlConnection(connectionString);
-            await connection.OpenAsync().ConfigureAwait(false);
-            var transaction = connection.BeginTransaction();
-            return new SystemTest(connection, transaction);
-        }
-
-
 
         public void Dispose()
         {
@@ -34,9 +24,19 @@ namespace SqlServerDocumentStorage.Tests
             connection?.Dispose();
         }
 
+        public static async Task<SystemTest> CreateAsync()
+        {
+            var connectionString =
+                @"Data Source=.\SQLEXPRESS;Initial Catalog=SqlServerDocumentStorage;Integrated Security=True";
+            var connection = new SqlConnection(connectionString);
+            await connection.OpenAsync().ConfigureAwait(false);
+            var transaction = connection.BeginTransaction();
+            return new SystemTest(connection, transaction);
+        }
+
         public DocumentManager GetDocumentManager()
         {
-            return new DocumentManager(connection, transaction) {};
+            return new DocumentManager(connection, transaction);
         }
     }
 }

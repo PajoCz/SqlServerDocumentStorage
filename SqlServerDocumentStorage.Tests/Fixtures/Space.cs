@@ -6,10 +6,10 @@ namespace SqlServerDocumentStorage.Tests.Fixtures
     {
         public long Id { get; set; }
 
-        [Index(DbType.String, length:"200")]
+        [Index(DbType.String, "200")]
         public string Name { get; set; }
 
-        [Index(DbType.String, length:"max")]
+        [Index(DbType.String, "max")]
         public string Description { get; set; }
     }
 }
