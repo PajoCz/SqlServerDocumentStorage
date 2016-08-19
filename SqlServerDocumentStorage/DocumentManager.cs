@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Configuration;
 using System.Data;
 using System.Data.SqlClient;
 using System.Linq;
@@ -11,14 +12,34 @@ using Newtonsoft.Json;
 
 namespace SqlServerDocumentStorage
 {
-    public class DocumentManager : IDisposable
+    public class DocumentManager : IDocumentManager
     {
         private readonly SqlConnection connection;
         private readonly ICollection<IInsertionContext> inserts = new Collection<IInsertionContext>();
         private readonly SqlTransaction transaction;
         private readonly ICollection<IUpdateContext> updates = new Collection<IUpdateContext>();
 
-        public DocumentManager(SqlConnection connection, SqlTransaction transaction)
+        public static IDocumentManager Create(SqlConnection connection, SqlTransaction transaction)
+        {
+            return new DocumentManager(connection, transaction);
+        }
+
+        public static async Task<IDocumentManager> CreateAsync(string connectionStringOrName)
+        {
+            var connectionString = connectionStringOrName;
+
+            if (connectionStringOrName.StartsWith("name"))
+            {
+                var connectionName = connectionStringOrName.Remove(0, 5);
+                connectionString = ConfigurationManager.ConnectionStrings[connectionName].ConnectionString;
+            }
+
+            var connection = new SqlConnection();
+            await connection.OpenAsync().ConfigureAwait(false);
+            return new DocumentManager(connection, null);
+        }
+
+        private DocumentManager(SqlConnection connection, SqlTransaction transaction)
         {
             this.connection = connection;
             this.transaction = transaction;

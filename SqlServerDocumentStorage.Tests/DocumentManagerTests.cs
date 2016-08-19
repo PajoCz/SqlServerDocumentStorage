@@ -12,7 +12,7 @@ namespace SqlServerDocumentStorage.Tests
         {
             using (var test = await SystemTest.CreateAsync())
             {
-                var documentManager = test.GetDocumentManager();
+                IDocumentManager documentManager = test.GetDocumentManager();
 
                 var space = new Space
                 {
