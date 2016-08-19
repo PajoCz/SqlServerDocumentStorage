@@ -1,13 +1,13 @@
 ﻿using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using NUnit.Framework;
 using SqlServerDocumentStorage.Tests.Fixtures;
 
 namespace SqlServerDocumentStorage.Tests
 {
-    [TestClass]
+    [TestFixture]
     public class DocumentManagerTests
     {
-        [TestMethod]
+        [Test]
         public async Task Insert()
         {
             using (var test = await SystemTest.CreateAsync())
@@ -38,7 +38,7 @@ namespace SqlServerDocumentStorage.Tests
             }
         }
 
-        [TestMethod]
+        [Test]
         public async Task CanDelete()
         {
             using (var test = await SystemTest.CreateAsync())
@@ -72,7 +72,7 @@ namespace SqlServerDocumentStorage.Tests
             }
         }
 
-        [TestMethod]
+        [Test]
         public async Task CanUpdate()
         {
             using (var test = await SystemTest.CreateAsync())
