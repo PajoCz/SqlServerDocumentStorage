@@ -34,9 +34,9 @@ namespace SqlServerDocumentStorage.Tests
             return new SystemTest(connection, transaction);
         }
 
-        public DocumentManager GetDocumentManager()
+        public IDocumentManager GetDocumentManager()
         {
-            return new DocumentManager(connection, transaction);
+            return DocumentManager.Create(connection, transaction);
         }
     }
 }
